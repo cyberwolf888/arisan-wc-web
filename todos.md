@@ -34,7 +34,7 @@ Tasks ordered by dependency. Each task is independently verifiable.
 
 ---
 
-## Phase 2: Shared Layout & Navigation
+## Phase 2: Shared Layout & Navigation (Completed)
 
 ### 2.1 Initialize shadcn/ui
 - Run `npx shadcn@latest init` (default style, neutral base, css variables yes)
