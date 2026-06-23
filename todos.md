@@ -52,7 +52,7 @@ Tasks ordered by dependency. Each task is independently verifiable.
 
 ---
 
-## Phase 3: Home Page (Read-only Team List)
+## Phase 3: Home Page (Read-only Team List) (Completed)
 
 ### 3.1 Create server data fetcher for home page
 - File: `app/page.tsx` (replace existing)
