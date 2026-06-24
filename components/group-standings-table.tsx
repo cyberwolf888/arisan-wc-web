@@ -55,17 +55,17 @@ export function GroupStandingsTable({ groupName, teams }: GroupStandingsTablePro
             <div
               key={team.teamId}
               className={`grid grid-cols-[2.5rem_1fr_3rem_3rem_3rem_3rem_3rem] items-center border-t border-border/20 px-4 py-3 ${
-                index % 2 === 0 ? "bg-muted/15" : ""
+                !isTopTwo ? "bg-gray-100" : index % 2 === 0 ? "bg-muted/15" : ""
               }`}
             >
               <div
-                className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold"
+                className={`flex h-7 w-7 items-center justify-center rounded-full font-bold ${rank > 2 ? "text-xl" : "text-xs"}`}
                 style={{
                   backgroundColor: isTopTwo ? "#fef3c7" : "#f3f4f6",
                   color: isTopTwo ? "#92400e" : "#6b7280",
                 }}
               >
-                {rank}
+                {rank > 2 ? "💩" : rank}
               </div>
 
               <div className="flex min-w-0 items-center gap-2.5">
@@ -76,7 +76,7 @@ export function GroupStandingsTable({ groupName, teams }: GroupStandingsTablePro
                       alt={`${team.nameEn} flag`}
                       width={60}
                       height={40}
-                      className="h-full w-full object-cover"
+                      className={`h-full w-full object-cover ${!isTopTwo ? "grayscale" : ""}`}
                       loading="lazy"
                     />
                   ) : (

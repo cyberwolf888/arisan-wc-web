@@ -121,7 +121,7 @@ Tasks ordered by dependency. Each task is independently verifiable.
 
 ---
 
-## Phase 5: Team Assignments CRUD
+## Phase 5: Team Assignments CRUD (Completed)
 
 ### 5.1 Create assignments data layer
 - File: `lib/assignments.ts`
@@ -161,7 +161,7 @@ Tasks ordered by dependency. Each task is independently verifiable.
 
 ---
 
-## Phase 6: Polish
+## Phase 6: Polish (Completed)
 
 ### 6.1 Add .env file
 - File: `.env.local` (create if missing)
