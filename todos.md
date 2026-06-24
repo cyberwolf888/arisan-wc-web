@@ -78,7 +78,7 @@ Tasks ordered by dependency. Each task is independently verifiable.
 
 ---
 
-## Phase 4: Members CRUD
+## Phase 4: Members CRUD (Completed)
 
 ### 4.1 Create members data layer
 - File: `lib/members.ts`

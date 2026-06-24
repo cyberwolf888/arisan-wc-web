@@ -1,12 +1,38 @@
-export default function TeamsPage() {
-  return (
-    <section className="w-full">
-      <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
-        <h1 className="text-xl font-semibold tracking-tight">Teams</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Team assignment CRUD screen arrives in Phase 5.
-        </p>
-      </div>
-    </section>
-  );
+import { unstable_rethrow } from "next/navigation";
+
+import { AssignmentsTableClient } from "./assignments-table-client";
+
+import { PageErrorState } from "@/components/page-error-state";
+import { getErrorMessage } from "@/lib/errors";
+import { getAssignments } from "@/lib/assignments";
+
+async function getTeamsPageData() {
+  try {
+    return {
+      assignments: await getAssignments(),
+      errorMessage: null,
+    };
+  } catch (error) {
+    unstable_rethrow(error);
+
+    return {
+      assignments: null,
+      errorMessage: getErrorMessage(error, "Failed to load assignments. Please try again."),
+    };
+  }
+}
+
+export default async function TeamsPage() {
+  const { assignments, errorMessage } = await getTeamsPageData();
+
+  if (errorMessage || !assignments) {
+    return (
+      <PageErrorState
+        title="Unable to load assignments"
+        message={errorMessage ?? "Failed to load assignments. Please try again."}
+      />
+    );
+  }
+
+  return <AssignmentsTableClient initialAssignments={assignments} />;
 }

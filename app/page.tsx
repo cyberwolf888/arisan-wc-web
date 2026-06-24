@@ -1,4 +1,8 @@
+import { unstable_rethrow } from "next/navigation";
+
 import { TeamCard } from "@/components/team-card";
+import { PageErrorState } from "@/components/page-error-state";
+import { getErrorMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/types";
 
@@ -108,9 +112,35 @@ async function getHomeData() {
   };
 }
 
+async function getHomePageData() {
+  try {
+    return {
+      data: await getHomeData(),
+      errorMessage: null,
+    };
+  } catch (error) {
+    unstable_rethrow(error);
+
+    return {
+      data: null,
+      errorMessage: getErrorMessage(error, "Failed to load home page. Please try again."),
+    };
+  }
+}
+
 export default async function HomePage() {
-  const { orderedGroups, teamsByGroup, membersByTeamId, totalTeams, totalAssignments } =
-    await getHomeData();
+  const result = await getHomePageData();
+
+  if (!result.data) {
+    return (
+      <PageErrorState
+        title="Unable to load team representatives"
+        message={result.errorMessage ?? "Failed to load home page. Please try again."}
+      />
+    );
+  }
+
+  const { orderedGroups, teamsByGroup, membersByTeamId, totalTeams, totalAssignments } = result.data;
 
   return (
     <section className="w-full space-y-6">

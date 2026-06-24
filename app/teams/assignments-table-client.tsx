@@ -25,33 +25,29 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getErrorMessage } from "@/lib/errors";
-import type { Member } from "@/lib/members";
+import type { Assignment } from "@/lib/assignments";
 import { cn } from "@/lib/utils";
 
-import { deleteMemberAction } from "./actions";
+import { deleteAssignmentAction } from "./actions";
 
-type MembersTableClientProps = {
-  initialMembers: Member[];
+type AssignmentsTableClientProps = {
+  initialAssignments: Assignment[];
 };
 
-function getMemberName(name: string | null) {
-  return name?.trim() || "Unnamed member";
-}
-
-export function MembersTableClient({ initialMembers }: MembersTableClientProps) {
+export function AssignmentsTableClient({ initialAssignments }: AssignmentsTableClientProps) {
   const router = useRouter();
-  const [members, setMembers] = useState<Member[]>(initialMembers);
+  const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
+  const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const selectedMemberName = useMemo(
-    () => getMemberName(memberToDelete?.name ?? null),
-    [memberToDelete],
-  );
+  const selectedDescription = useMemo(() => {
+    if (!assignmentToDelete) return "";
+    return `${assignmentToDelete.member_name} from ${assignmentToDelete.team_name}`;
+  }, [assignmentToDelete]);
 
   const handleDelete = async () => {
-    if (!memberToDelete || isDeleting) {
+    if (!assignmentToDelete || isDeleting) {
       return;
     }
 
@@ -59,14 +55,14 @@ export function MembersTableClient({ initialMembers }: MembersTableClientProps) 
     setIsDeleting(true);
 
     try {
-      await deleteMemberAction(memberToDelete._id);
-      setMembers((previousMembers) =>
-        previousMembers.filter((member) => member._id !== memberToDelete._id),
+      await deleteAssignmentAction(assignmentToDelete._id);
+      setAssignments((previousAssignments) =>
+        previousAssignments.filter((a) => a._id !== assignmentToDelete._id),
       );
-      setMemberToDelete(null);
+      setAssignmentToDelete(null);
       router.refresh();
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, "Failed to load members. Please try again."));
+      setErrorMessage(getErrorMessage(error, "Failed to load assignments. Please try again."));
     } finally {
       setIsDeleting(false);
     }
@@ -80,14 +76,14 @@ export function MembersTableClient({ initialMembers }: MembersTableClientProps) 
             <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
               Arisan Bola PELITA
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Members</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Team Assignments</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Manage participant names and payment status.
+              Assign members to teams and manage existing assignments.
             </p>
           </div>
 
-          <Link href="/members/new" className={cn(buttonVariants({ variant: "default" }))}>
-            Add Member
+          <Link href="/teams/assign" className={cn(buttonVariants({ variant: "default" }))}>
+            Add Assignment
           </Link>
         </div>
       </div>
@@ -100,15 +96,15 @@ export function MembersTableClient({ initialMembers }: MembersTableClientProps) 
         </div>
       ) : null}
 
-      {members.length === 0 ? (
+      {assignments.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border/70 bg-card/80 p-6 text-center shadow-sm">
-          <p className="text-base font-medium">No members yet. Add one.</p>
+          <p className="text-base font-medium">No assignments yet. Assign a member to a team.</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Create your first member to start assigning team representatives.
+            Create your first assignment to start matching members with teams.
           </p>
           <div className="mt-4">
-            <Link href="/members/new" className={cn(buttonVariants({ variant: "default" }))}>
-              Add Member
+            <Link href="/teams/assign" className={cn(buttonVariants({ variant: "default" }))}>
+              Add Assignment
             </Link>
           </div>
         </div>
@@ -117,41 +113,44 @@ export function MembersTableClient({ initialMembers }: MembersTableClientProps) 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Payment Status</TableHead>
+                <TableHead>Team</TableHead>
+                <TableHead>Assigned Member</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {members.map((member) => (
-                <TableRow key={member._id}>
-                  <TableCell className="font-medium">{getMemberName(member.name)}</TableCell>
+              {assignments.map((assignment) => (
+                <TableRow key={assignment._id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      {assignment.team_flag ? (
+                        <span className="text-base leading-none">{assignment.team_flag}</span>
+                      ) : null}
+                      {assignment.team_name}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge
                       variant="outline"
-                      className={cn(
-                        member.payment_status
-                          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                          : "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300",
-                      )}
+                      className="border-primary/30 bg-primary/5 text-primary"
                     >
-                      {member.payment_status ? "Paid" : "Unpaid"}
+                      {assignment.member_name}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-2">
                       <Link
-                        href={`/members/${member._id}/edit`}
+                        href={`/teams/${assignment._id}/reassign`}
                         className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
                       >
-                        Edit
+                        Reassign
                       </Link>
                       <Button
                         variant="destructive"
                         size="sm"
                         onClick={() => {
                           setErrorMessage(null);
-                          setMemberToDelete(member);
+                          setAssignmentToDelete(assignment);
                         }}
                       >
                         Delete
@@ -166,19 +165,18 @@ export function MembersTableClient({ initialMembers }: MembersTableClientProps) 
       )}
 
       <AlertDialog
-        open={Boolean(memberToDelete)}
+        open={Boolean(assignmentToDelete)}
         onOpenChange={(open) => {
           if (!open && !isDeleting) {
-            setMemberToDelete(null);
+            setAssignmentToDelete(null);
           }
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete member?</AlertDialogTitle>
+            <AlertDialogTitle>Delete assignment?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove {selectedMemberName}. If member still assigned to teams, delete may fail
-              until assignments removed.
+              This will remove {selectedDescription}. The member and team will not be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

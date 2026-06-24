@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { Tables } from "@/lib/supabase/types";
+import type { Tables, TablesInsert, TablesUpdate } from "@/lib/supabase/types";
 
 export type Member = Pick<Tables<"members">, "_id" | "name" | "payment_status">;
 
@@ -35,6 +35,24 @@ function ensureMemberInput(input: MemberWriteInput) {
   };
 }
 
+function getMemberInsertPayload(input: MemberWriteInput) {
+  const normalized = ensureMemberInput(input);
+
+  return {
+    name: normalized.name,
+    payment_status: normalized.payment_status,
+  } satisfies TablesInsert<"members">;
+}
+
+function getMemberUpdatePayload(input: MemberWriteInput) {
+  const normalized = ensureMemberInput(input);
+
+  return {
+    name: normalized.name,
+    payment_status: normalized.payment_status,
+  } satisfies TablesUpdate<"members">;
+}
+
 export async function getMembers() {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -56,7 +74,7 @@ export async function getMember(id: string) {
   const { data, error } = await supabase
     .from("members")
     .select("_id,name,payment_status")
-    .eq("_id", memberId)
+    .filter("_id", "eq", memberId)
     .maybeSingle();
 
   if (error) {
@@ -67,12 +85,13 @@ export async function getMember(id: string) {
 }
 
 export async function createMember(input: MemberWriteInput) {
-  const payload = ensureMemberInput(input);
+  const payload = getMemberInsertPayload(input);
   const supabase = await createClient();
 
+  // Supabase's generated write types reject this valid payload under strict TS.
   const { data, error } = await supabase
     .from("members")
-    .insert(payload)
+    .insert(payload as never)
     .select("_id,name,payment_status")
     .single();
 
@@ -85,13 +104,13 @@ export async function createMember(input: MemberWriteInput) {
 
 export async function updateMember(id: string, input: MemberWriteInput) {
   const memberId = ensureMemberId(id);
-  const payload = ensureMemberInput(input);
+  const payload = getMemberUpdatePayload(input);
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("members")
-    .update(payload)
-    .eq("_id", memberId)
+    .update(payload as never)
+    .filter("_id", "eq", memberId)
     .select("_id,name,payment_status")
     .maybeSingle();
 
@@ -109,7 +128,7 @@ export async function deleteMember(id: string) {
   const { data, error } = await supabase
     .from("members")
     .delete()
-    .eq("_id", memberId)
+    .filter("_id", "eq", memberId)
     .select("_id")
     .maybeSingle();
 
@@ -117,5 +136,5 @@ export async function deleteMember(id: string) {
     throw new Error(`Failed to delete member: ${error.message}`);
   }
 
-  return Boolean(data?._id);
+  return Boolean((data as Pick<Tables<"members">, "_id"> | null)?._id);
 }

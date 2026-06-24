@@ -16,6 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { getErrorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 
 export type MemberFormValues = {
@@ -31,14 +32,6 @@ type MemberFormProps = {
   initialValues?: MemberFormValues;
   onSubmit: (values: MemberFormValues) => Promise<void>;
 };
-
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return "Failed to save member. Please try again.";
-}
 
 export function MemberForm({
   title,
@@ -68,7 +61,7 @@ export function MemberForm({
         payment_status: values.payment_status,
       });
     } catch (error) {
-      setSubmitError(getErrorMessage(error));
+      setSubmitError(getErrorMessage(error, "Failed to save member. Please try again."));
     } finally {
       setIsSubmitting(false);
     }
@@ -129,7 +122,10 @@ export function MemberForm({
             />
 
             {submitError ? (
-              <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <p
+                role="alert"
+                className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
                 {submitError}
               </p>
             ) : null}
