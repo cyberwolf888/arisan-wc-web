@@ -1,7 +1,7 @@
 import { unstable_rethrow } from "next/navigation";
 
-import { GroupStandingsTable } from "@/components/group-standings-table";
 import type { EnrichedTeam } from "@/components/group-standings-table";
+import { HomeSearchWrapper } from "@/components/home-search-wrapper";
 import { PageErrorState } from "@/components/page-error-state";
 import { getErrorMessage } from "@/lib/errors";
 import { fetchGroupStandings } from "@/lib/groups-api";
@@ -183,14 +183,10 @@ export default async function HomePage() {
         </p>
       </div> */}
 
-      {orderedGroups.map((group) => {
-        const teams = enrichedByGroup.get(group) ?? [];
-        if (teams.length === 0) return null;
-
-        return (
-          <GroupStandingsTable key={group} groupName={group} teams={teams} />
-        );
-      })}
+      <HomeSearchWrapper
+        orderedGroups={orderedGroups}
+        enrichedByGroup={Object.fromEntries(enrichedByGroup)}
+      />
     </section>
   );
 }
