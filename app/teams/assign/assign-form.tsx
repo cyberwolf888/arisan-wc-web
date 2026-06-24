@@ -15,13 +15,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { getErrorMessage } from "@/lib/errors";
 import type { Member } from "@/lib/members";
 import { cn } from "@/lib/utils";
@@ -82,67 +76,77 @@ export function AssignForm({ teams, members }: AssignFormProps) {
               control={form.control}
               name="team_id"
               rules={{ required: "Team is required." }}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Team</FormLabel>
-                  <FormControl>
-                    <Select
-                      value={field.value}
-                      onValueChange={(value) => field.onChange(value)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a team..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teams.map((team) => (
-                          <SelectItem key={team._id} value={team._id}>
+              render={({ field }) => {
+                const teamOptions = teams.map((team) => ({
+                  value: team._id,
+                  label: team.name_en ?? "Unknown team",
+                }));
+
+                const flagMap = new Map(teams.map((t) => [t._id, t.flag]));
+
+                return (
+                  <FormItem>
+                    <FormLabel>Team</FormLabel>
+                    <FormControl>
+                      <Combobox
+                        items={teamOptions}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Search teams..."
+                        renderItem={(item) => {
+                          const flag = flagMap.get(item.value);
+                          return (
                             <span className="flex items-center gap-2">
-                              {team.flag ? <span>{team.flag}</span> : null}
-                              {team.name_en ?? "Unknown team"}
+                              {flag ? (
+                                <img
+                                  src={flag}
+                                  alt=""
+                                  className="size-5 shrink-0 object-contain"
+                                />
+                              ) : null}
+                              {item.label}
                             </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormDescription>
-                    Choose the team you want to assign a member to.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+                          );
+                        }}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Choose the team you want to assign a member to.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
 
             <FormField
               control={form.control}
               name="member_id"
               rules={{ required: "Member is required." }}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Member</FormLabel>
-                  <FormControl>
-                    <Select
-                      value={field.value}
-                      onValueChange={(value) => field.onChange(value)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a member..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {members.map((member) => (
-                          <SelectItem key={member._id} value={member._id}>
-                            {member.name?.trim() || "Unnamed member"}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormDescription>
-                    Choose the member to assign to this team.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const memberOptions = members.map((member) => ({
+                  value: member._id,
+                  label: member.name?.trim() || "Unnamed member",
+                }));
+
+                return (
+                  <FormItem>
+                    <FormLabel>Member</FormLabel>
+                    <FormControl>
+                      <Combobox
+                        items={memberOptions}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Search members..."
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Choose the member to assign to this team.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
 
             {submitError ? (

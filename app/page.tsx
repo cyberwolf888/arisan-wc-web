@@ -1,8 +1,10 @@
 import { unstable_rethrow } from "next/navigation";
 
-import { TeamCard } from "@/components/team-card";
+import { GroupStandingsTable } from "@/components/group-standings-table";
+import type { EnrichedTeam } from "@/components/group-standings-table";
 import { PageErrorState } from "@/components/page-error-state";
 import { getErrorMessage } from "@/lib/errors";
+import { fetchGroupStandings } from "@/lib/groups-api";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/types";
 
@@ -18,29 +20,15 @@ function normalizeGroup(value: string | null) {
   return normalized || UNGROUPED;
 }
 
-function sortTeams(teamA: TeamRow, teamB: TeamRow) {
-  if (teamA.id === null && teamB.id === null) {
-    return (teamA.name_en || "").localeCompare(teamB.name_en || "");
-  }
-
-  if (teamA.id === null) {
-    return 1;
-  }
-
-  if (teamB.id === null) {
-    return -1;
-  }
-
-  return teamA.id - teamB.id;
-}
-
 async function getHomeData() {
   const supabase = await createClient();
 
-  const [teamsResult, membersResult, assignmentsResult] = await Promise.all([
+  // Fetch Supabase data + external API in parallel
+  const [teamsResult, membersResult, assignmentsResult, groupStatsMap] = await Promise.all([
     supabase.from("teams").select("_id,id,groups,name_en,flag"),
     supabase.from("members").select("_id,name"),
     supabase.from("member_teams").select("member_id,team_id"),
+    fetchGroupStandings(),
   ]);
 
   if (teamsResult.error) {
@@ -59,6 +47,7 @@ async function getHomeData() {
   const members = (membersResult.data ?? []) as MemberRow[];
   const assignments = (assignmentsResult.data ?? []) as AssignmentRow[];
 
+  // ── Member name lookups ──────────────────────────────────────────────────
   const memberNameById = new Map(
     members.map((member) => [member._id, member.name?.trim() || "Unnamed member"]),
   );
@@ -66,47 +55,87 @@ async function getHomeData() {
   const membersByTeamId = new Map<string, string[]>();
 
   for (const assignment of assignments) {
-    if (!assignment.team_id) {
-      continue;
-    }
+    if (!assignment.team_id) continue;
 
     const memberName = memberNameById.get(assignment.member_id);
-    if (!memberName) {
-      continue;
-    }
+    if (!memberName) continue;
 
     const assignedMembers = membersByTeamId.get(assignment.team_id) ?? [];
-
     if (!assignedMembers.includes(memberName)) {
       assignedMembers.push(memberName);
       membersByTeamId.set(assignment.team_id, assignedMembers);
     }
   }
 
+  // ── Build team lookup by numeric id ─────────────────────────────────────
+  const teamByNumericId = new Map<number, TeamRow>();
   const teamsByGroup = new Map<string, TeamRow[]>();
 
   for (const team of teams) {
+    if (team.id !== null) {
+      teamByNumericId.set(team.id, team);
+    }
     const group = normalizeGroup(team.groups);
     const groupedTeams = teamsByGroup.get(group) ?? [];
-
     groupedTeams.push(team);
     teamsByGroup.set(group, groupedTeams);
   }
 
-  for (const groupedTeams of teamsByGroup.values()) {
-    groupedTeams.sort(sortTeams);
-  }
-
+  // ── Determine ordered group keys ─────────────────────────────────────────
   const extraGroups = Array.from(teamsByGroup.keys())
-    .filter((group) => !BASE_GROUPS.includes(group))
+    .filter((group) => !BASE_GROUPS.includes(group) && group !== UNGROUPED)
     .sort();
 
-  const orderedGroups = [...BASE_GROUPS, ...extraGroups];
+  // Include UNGROUPED last if it has teams
+  const ungroupedTeams = teamsByGroup.get(UNGROUPED) ?? [];
+  const orderedGroups = [
+    ...BASE_GROUPS,
+    ...extraGroups,
+    ...(ungroupedTeams.length > 0 ? [UNGROUPED] : []),
+  ];
+
+  // ── Build enriched teams per group ───────────────────────────────────────
+  const enrichedByGroup = new Map<string, EnrichedTeam[]>();
+
+  for (const group of orderedGroups) {
+    const localTeams = teamsByGroup.get(group) ?? [];
+    const apiStats = groupStatsMap.get(group) ?? [];
+
+    // Build a map of numericId → API stats for quick lookup
+    const statsByNumericId = new Map(
+      apiStats.map((s) => [parseInt(s.team_id, 10), s]),
+    );
+
+    // Enrich each local team with API stats
+    const enriched: EnrichedTeam[] = localTeams.map((team) => {
+      const stats = team.id !== null ? statsByNumericId.get(team.id) : undefined;
+      return {
+        teamId: team._id,
+        numericId: team.id,
+        nameEn: team.name_en?.trim() || "Unknown team",
+        flag: team.flag,
+        members: membersByTeamId.get(team._id) ?? [],
+        mp: stats ? parseInt(stats.mp, 10) : 0,
+        w: stats ? parseInt(stats.w, 10) : 0,
+        d: stats ? parseInt(stats.d, 10) : 0,
+        l: stats ? parseInt(stats.l, 10) : 0,
+        pts: stats ? parseInt(stats.pts, 10) : 0,
+      };
+    });
+
+    // Sort by pts descending; ties broken by team numeric id ascending
+    enriched.sort((a, b) => {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      if (a.numericId !== null && b.numericId !== null) return a.numericId - b.numericId;
+      return a.nameEn.localeCompare(b.nameEn);
+    });
+
+    enrichedByGroup.set(group, enriched);
+  }
 
   return {
     orderedGroups,
-    teamsByGroup,
-    membersByTeamId,
+    enrichedByGroup,
     totalTeams: teams.length,
     totalAssignments: assignments.length,
   };
@@ -120,7 +149,6 @@ async function getHomePageData() {
     };
   } catch (error) {
     unstable_rethrow(error);
-
     return {
       data: null,
       errorMessage: getErrorMessage(error, "Failed to load home page. Please try again."),
@@ -140,11 +168,11 @@ export default async function HomePage() {
     );
   }
 
-  const { orderedGroups, teamsByGroup, membersByTeamId, totalTeams, totalAssignments } = result.data;
+  const { orderedGroups, enrichedByGroup, totalTeams, totalAssignments } = result.data;
 
   return (
     <section className="w-full space-y-6">
-      <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
+      {/* <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
         <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
           Arisan Bola PELITA
         </p>
@@ -153,40 +181,14 @@ export default async function HomePage() {
           Read-only list of teams and assigned members. {totalTeams} teams, {totalAssignments} active
           assignments.
         </p>
-      </div>
+      </div> */}
 
       {orderedGroups.map((group) => {
-        const teamsInGroup = teamsByGroup.get(group) ?? [];
-        const title = group === UNGROUPED ? "Ungrouped" : `Group ${group}`;
+        const teams = enrichedByGroup.get(group) ?? [];
+        if (teams.length === 0) return null;
 
         return (
-          <section
-            key={group}
-            className="rounded-2xl border border-border/60 bg-card/70 p-4 shadow-sm sm:p-5"
-          >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                {teamsInGroup.length} teams
-              </p>
-            </div>
-
-            {teamsInGroup.length > 0 ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {teamsInGroup.map((team) => (
-                  <TeamCard
-                    key={team._id}
-                    team={{ name_en: team.name_en, flag: team.flag }}
-                    members={membersByTeamId.get(team._id) ?? []}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className="rounded-lg border border-dashed border-border/70 bg-muted/25 px-3 py-4 text-sm text-muted-foreground">
-                No teams available for this group yet.
-              </p>
-            )}
-          </section>
+          <GroupStandingsTable key={group} groupName={group} teams={teams} />
         );
       })}
     </section>

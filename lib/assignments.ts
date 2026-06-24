@@ -10,6 +10,19 @@ export type Assignment = {
   team_flag: string | null;
 };
 
+export type TeamSlot = {
+  _id: string;
+  team_id: string;
+  team_name: string;
+  team_flag: string | null;
+} | null;
+
+export type MemberAssignmentGroup = {
+  member_id: string;
+  member_name: string;
+  teams: [TeamSlot, TeamSlot, TeamSlot];
+};
+
 export type AssignmentWriteInput = {
   member_id: string;
   team_id: string;
@@ -172,4 +185,32 @@ export async function deleteAssignment(id: string) {
   }
 
   return Boolean((data as Pick<Tables<"member_teams">, "_id"> | null)?._id);
+}
+
+export async function getGroupedAssignments(): Promise<MemberAssignmentGroup[]> {
+  const assignments = await getAssignments();
+
+  const memberMap = new Map<string, { member_name: string; slots: Assignment[] }>();
+  const memberOrder: string[] = [];
+
+  for (const assignment of assignments) {
+    if (!memberMap.has(assignment.member_id)) {
+      memberMap.set(assignment.member_id, { member_name: assignment.member_name, slots: [] });
+      memberOrder.push(assignment.member_id);
+    }
+    memberMap.get(assignment.member_id)!.slots.push(assignment);
+  }
+
+  return memberOrder.map((memberId) => {
+    const { member_name, slots } = memberMap.get(memberId)!;
+    const toSlot = (a: Assignment | undefined): TeamSlot =>
+      a && a.team_id
+        ? { _id: a._id, team_id: a.team_id, team_name: a.team_name, team_flag: a.team_flag }
+        : null;
+    return {
+      member_id: memberId,
+      member_name,
+      teams: [toSlot(slots[0]), toSlot(slots[1]), toSlot(slots[2])],
+    };
+  });
 }

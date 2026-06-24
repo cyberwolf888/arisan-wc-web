@@ -4,28 +4,28 @@ import { AssignmentsTableClient } from "./assignments-table-client";
 
 import { PageErrorState } from "@/components/page-error-state";
 import { getErrorMessage } from "@/lib/errors";
-import { getAssignments } from "@/lib/assignments";
+import { getGroupedAssignments } from "@/lib/assignments";
 
 async function getTeamsPageData() {
   try {
     return {
-      assignments: await getAssignments(),
+      groups: await getGroupedAssignments(),
       errorMessage: null,
     };
   } catch (error) {
     unstable_rethrow(error);
 
     return {
-      assignments: null,
+      groups: null,
       errorMessage: getErrorMessage(error, "Failed to load assignments. Please try again."),
     };
   }
 }
 
 export default async function TeamsPage() {
-  const { assignments, errorMessage } = await getTeamsPageData();
+  const { groups, errorMessage } = await getTeamsPageData();
 
-  if (errorMessage || !assignments) {
+  if (errorMessage || !groups) {
     return (
       <PageErrorState
         title="Unable to load assignments"
@@ -34,5 +34,5 @@ export default async function TeamsPage() {
     );
   }
 
-  return <AssignmentsTableClient initialAssignments={assignments} />;
+  return <AssignmentsTableClient initialGroups={groups} />;
 }

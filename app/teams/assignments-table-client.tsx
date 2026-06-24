@@ -1,5 +1,6 @@
 "use client";
 
+import { XIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -14,8 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -25,44 +25,54 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getErrorMessage } from "@/lib/errors";
-import type { Assignment } from "@/lib/assignments";
+import type { MemberAssignmentGroup, TeamSlot } from "@/lib/assignments";
 import { cn } from "@/lib/utils";
 
 import { deleteAssignmentAction } from "./actions";
 
-type AssignmentsTableClientProps = {
-  initialAssignments: Assignment[];
+type SlotToDelete = {
+  _id: string;
+  member_name: string;
+  team_name: string;
 };
 
-export function AssignmentsTableClient({ initialAssignments }: AssignmentsTableClientProps) {
+type AssignmentsTableClientProps = {
+  initialGroups: MemberAssignmentGroup[];
+};
+
+export function AssignmentsTableClient({ initialGroups }: AssignmentsTableClientProps) {
   const router = useRouter();
-  const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
+  const [groups, setGroups] = useState<MemberAssignmentGroup[]>(initialGroups);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
+  const [slotToDelete, setSlotToDelete] = useState<SlotToDelete | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const selectedDescription = useMemo(() => {
-    if (!assignmentToDelete) return "";
-    return `${assignmentToDelete.member_name} from ${assignmentToDelete.team_name}`;
-  }, [assignmentToDelete]);
+    if (!slotToDelete) return "";
+    return `${slotToDelete.member_name} from ${slotToDelete.team_name}`;
+  }, [slotToDelete]);
 
   const handleDelete = async () => {
-    if (!assignmentToDelete || isDeleting) {
-      return;
-    }
-
-    setErrorMessage(null);
+    if (!slotToDelete || isDeleting) return;
     setIsDeleting(true);
+    setErrorMessage(null);
 
     try {
-      await deleteAssignmentAction(assignmentToDelete._id);
-      setAssignments((previousAssignments) =>
-        previousAssignments.filter((a) => a._id !== assignmentToDelete._id),
+      await deleteAssignmentAction(slotToDelete._id);
+      setGroups((prev) =>
+        prev
+          .map((group) => ({
+            ...group,
+            teams: group.teams.map((slot) =>
+              slot?._id === slotToDelete._id ? null : slot,
+            ) as [TeamSlot, TeamSlot, TeamSlot],
+          }))
+          .filter((group) => group.teams.some((slot) => slot !== null)),
       );
-      setAssignmentToDelete(null);
+      setSlotToDelete(null);
       router.refresh();
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, "Failed to load assignments. Please try again."));
+      setErrorMessage(getErrorMessage(error, "Failed to delete assignment. Please try again."));
     } finally {
       setIsDeleting(false);
     }
@@ -96,7 +106,7 @@ export function AssignmentsTableClient({ initialAssignments }: AssignmentsTableC
         </div>
       ) : null}
 
-      {assignments.length === 0 ? (
+      {groups.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border/70 bg-card/80 p-6 text-center shadow-sm">
           <p className="text-base font-medium">No assignments yet. Assign a member to a team.</p>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -109,54 +119,63 @@ export function AssignmentsTableClient({ initialAssignments }: AssignmentsTableC
           </div>
         </div>
       ) : (
-        <div className="rounded-2xl border border-border/60 bg-card p-2 shadow-sm sm:p-3">
+        <div className="overflow-hidden rounded-2xl border border-border/60 shadow-sm">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Team</TableHead>
-                <TableHead>Assigned Member</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+              <TableRow className="bg-[#2d6a4f] hover:bg-[#2d6a4f]">
+                <TableHead className="w-14 text-center font-bold text-white">No.</TableHead>
+                <TableHead className="font-bold text-white">Nama</TableHead>
+                <TableHead className="text-center font-bold text-white">Tim 1</TableHead>
+                <TableHead className="text-center font-bold text-white">Tim 2</TableHead>
+                <TableHead className="text-center font-bold text-white">Tim 3</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {assignments.map((assignment) => (
-                <TableRow key={assignment._id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      {assignment.team_flag ? (
-                        <span className="text-base leading-none">{assignment.team_flag}</span>
-                      ) : null}
-                      {assignment.team_name}
-                    </div>
+              {groups.map((group, index) => (
+                <TableRow key={group.member_id} className="bg-[#f0f7f4] hover:bg-[#e6f2ec]">
+                  <TableCell className="text-center font-medium text-muted-foreground">
+                    {index + 1}
                   </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className="border-primary/30 bg-primary/5 text-primary"
-                    >
-                      {assignment.member_name}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-2">
-                      <Link
-                        href={`/teams/${assignment._id}/reassign`}
-                        className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                      >
-                        Reassign
-                      </Link>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => {
-                          setErrorMessage(null);
-                          setAssignmentToDelete(assignment);
-                        }}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </TableCell>
+                  <TableCell className="font-medium">{group.member_name}</TableCell>
+                  {group.teams.map((slot, i) => (
+                    <TableCell key={i} className="text-center">
+                      {slot ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          {slot.team_flag ? (
+                            slot.team_flag.startsWith("http") ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={slot.team_flag}
+                                alt={slot.team_name}
+                                width={24}
+                                height={16}
+                                className="inline-block rounded-sm object-cover"
+                              />
+                            ) : (
+                              <span className="text-base leading-none">{slot.team_flag}</span>
+                            )
+                          ) : null}
+                          {slot.team_name}
+                          <button
+                            type="button"
+                            className="ml-0.5 inline-flex size-4 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-destructive/15 hover:text-destructive"
+                            onClick={() => {
+                              setErrorMessage(null);
+                              setSlotToDelete({
+                                _id: slot._id,
+                                member_name: group.member_name,
+                                team_name: slot.team_name,
+                              });
+                            }}
+                          >
+                            <XIcon className="size-3" />
+                          </button>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  ))}
                 </TableRow>
               ))}
             </TableBody>
@@ -165,10 +184,10 @@ export function AssignmentsTableClient({ initialAssignments }: AssignmentsTableC
       )}
 
       <AlertDialog
-        open={Boolean(assignmentToDelete)}
+        open={Boolean(slotToDelete)}
         onOpenChange={(open) => {
           if (!open && !isDeleting) {
-            setAssignmentToDelete(null);
+            setSlotToDelete(null);
           }
         }}
       >
