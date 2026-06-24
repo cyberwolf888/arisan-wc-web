@@ -60,14 +60,12 @@ export function AssignmentsTableClient({ initialGroups }: AssignmentsTableClient
     try {
       await deleteAssignmentAction(slotToDelete._id);
       setGroups((prev) =>
-        prev
-          .map((group) => ({
-            ...group,
-            teams: group.teams.map((slot) =>
-              slot?._id === slotToDelete._id ? null : slot,
-            ) as [TeamSlot, TeamSlot, TeamSlot],
-          }))
-          .filter((group) => group.teams.some((slot) => slot !== null)),
+        prev.map((group) => ({
+          ...group,
+          teams: group.teams.map((slot) =>
+            slot?._id === slotToDelete._id ? null : slot,
+          ) as [TeamSlot, TeamSlot, TeamSlot],
+        })),
       );
       setSlotToDelete(null);
       router.refresh();

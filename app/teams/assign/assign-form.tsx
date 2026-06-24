@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -33,8 +32,8 @@ type AssignFormValues = {
 };
 
 export function AssignForm({ teams, members }: AssignFormProps) {
-  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const form = useForm<AssignFormValues>({
@@ -45,6 +44,7 @@ export function AssignForm({ teams, members }: AssignFormProps) {
   });
 
   const handleSubmit = form.handleSubmit(async (values) => {
+    setSubmitSuccess(false);
     setSubmitError(null);
     setIsSubmitting(true);
 
@@ -53,8 +53,8 @@ export function AssignForm({ teams, members }: AssignFormProps) {
         team_id: values.team_id,
         member_id: values.member_id,
       });
-      router.push("/teams");
-      router.refresh();
+      setSubmitSuccess(true);
+      form.reset();
     } catch (error) {
       setSubmitError(getErrorMessage(error, "Failed to save assignment. Please try again."));
     } finally {
@@ -148,6 +148,15 @@ export function AssignForm({ teams, members }: AssignFormProps) {
                 );
               }}
             />
+
+            {submitSuccess ? (
+              <p
+                role="alert"
+                className="rounded-lg border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-600"
+              >
+                Assignment saved successfully.
+              </p>
+            ) : null}
 
             {submitError ? (
               <p

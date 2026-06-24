@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Tables, TablesInsert, TablesUpdate } from "@/lib/supabase/types";
+import { getMembers } from "@/lib/members";
 
 export type Assignment = {
   _id: string;
@@ -188,7 +189,7 @@ export async function deleteAssignment(id: string) {
 }
 
 export async function getGroupedAssignments(): Promise<MemberAssignmentGroup[]> {
-  const assignments = await getAssignments();
+  const [assignments, members] = await Promise.all([getAssignments(), getMembers()]);
 
   const memberMap = new Map<string, { member_name: string; slots: Assignment[] }>();
   const memberOrder: string[] = [];
@@ -200,6 +201,20 @@ export async function getGroupedAssignments(): Promise<MemberAssignmentGroup[]> 
     }
     memberMap.get(assignment.member_id)!.slots.push(assignment);
   }
+
+  const unassigned: string[] = [];
+  for (const member of members) {
+    if (!memberMap.has(member._id)) {
+      memberMap.set(member._id, { member_name: member.name || "Unnamed member", slots: [] });
+      unassigned.push(member._id);
+    }
+  }
+  unassigned.sort((a, b) => {
+    const nameA = memberMap.get(a)!.member_name;
+    const nameB = memberMap.get(b)!.member_name;
+    return nameA.localeCompare(nameB);
+  });
+  memberOrder.push(...unassigned);
 
   return memberOrder.map((memberId) => {
     const { member_name, slots } = memberMap.get(memberId)!;
