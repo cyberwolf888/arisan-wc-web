@@ -38,11 +38,13 @@ type SlotToDelete = {
 
 type AssignmentsTableClientProps = {
   initialGroups: MemberAssignmentGroup[];
+  r32TeamIds: string[];
 };
 
-export function AssignmentsTableClient({ initialGroups }: AssignmentsTableClientProps) {
+export function AssignmentsTableClient({ initialGroups, r32TeamIds }: AssignmentsTableClientProps) {
   const router = useRouter();
   const [groups, setGroups] = useState<MemberAssignmentGroup[]>(initialGroups);
+  const r32Set = useMemo(() => new Set(r32TeamIds), [r32TeamIds]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [slotToDelete, setSlotToDelete] = useState<SlotToDelete | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -129,53 +131,70 @@ export function AssignmentsTableClient({ initialGroups }: AssignmentsTableClient
               </TableRow>
             </TableHeader>
             <TableBody>
-              {groups.map((group, index) => (
+              {groups.map((group, index) => {
+                const hasAnyR32Team = group.teams.some(
+                  (slot) => slot && r32Set.has(slot.team_id),
+                );
+                return (
                 <TableRow key={group.member_id} className="bg-[#f0f7f4] hover:bg-[#e6f2ec]">
                   <TableCell className="text-center font-medium text-muted-foreground">
                     {index + 1}
                   </TableCell>
-                  <TableCell className="font-medium">{group.member_name}</TableCell>
-                  {group.teams.map((slot, i) => (
-                    <TableCell key={i} className="text-center">
-                      {slot ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          {slot.team_flag ? (
-                            slot.team_flag.startsWith("http") ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={slot.team_flag}
-                                alt={slot.team_name}
-                                width={24}
-                                height={16}
-                                className="inline-block rounded-sm object-cover"
-                              />
-                            ) : (
-                              <span className="text-base leading-none">{slot.team_flag}</span>
-                            )
-                          ) : null}
-                          {slot.team_name}
-                          <button
-                            type="button"
-                            className="ml-0.5 inline-flex size-4 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-destructive/15 hover:text-destructive"
-                            onClick={() => {
-                              setErrorMessage(null);
-                              setSlotToDelete({
-                                _id: slot._id,
-                                member_name: group.member_name,
-                                team_name: slot.team_name,
-                              });
-                            }}
-                          >
-                            <XIcon className="size-3" />
-                          </button>
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                  ))}
+                  <TableCell className="font-medium">
+                    {!hasAnyR32Team ? <span>💩 {group.member_name}</span> : group.member_name}
+                  </TableCell>
+                  {group.teams.map((slot, i) => {
+                    const isInR32 = slot ? r32Set.has(slot.team_id) : true;
+                    return (
+                      <TableCell key={i} className="text-center">
+                        {slot ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            {slot.team_flag ? (
+                              slot.team_flag.startsWith("http") ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={slot.team_flag}
+                                  alt={slot.team_name}
+                                  width={24}
+                                  height={16}
+                                  className={cn(
+                                    "inline-block rounded-sm object-cover",
+                                    !isInR32 && "grayscale opacity-50",
+                                  )}
+                                />
+                              ) : (
+                                <span className={cn("text-base leading-none", !isInR32 && "opacity-50")}>
+                                  {slot.team_flag}
+                                </span>
+                              )
+                            ) : null}
+                            <span className={cn(!isInR32 && "line-through text-muted-foreground")}>
+                              {slot.team_name}
+                            </span>
+                            <button
+                              type="button"
+                              className="ml-0.5 inline-flex size-4 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-destructive/15 hover:text-destructive"
+                              onClick={() => {
+                                setErrorMessage(null);
+                                setSlotToDelete({
+                                  _id: slot._id,
+                                  member_name: group.member_name,
+                                  team_name: slot.team_name,
+                                });
+                              }}
+                            >
+                              <XIcon className="size-3" />
+                            </button>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
-              ))}
+              );
+            })}
             </TableBody>
           </Table>
         </div>
