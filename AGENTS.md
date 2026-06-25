@@ -24,6 +24,12 @@ When working with Supabase in this project, always:
 6. **Always enable RLS** on new tables and create appropriate policies. Basic RLS must pass the security advisor before merging.
 <!-- END:supabase-agent-rules -->
 
+<!-- BEGIN:ponytail-agent-rules -->
+# Ponytail-first coding
+
+Always load the Ponytail mode (`mode: ponytail`) before writing any code for this project.
+<!-- END:ponytail-agent-rules -->
+
 <!-- BEGIN:caveman-agent-rules -->
 # Caveman communication mode
 

@@ -1,6 +1,7 @@
 import Image from "next/image";
 
 import { parseScorers, type EnrichedGame } from "@/lib/games-api";
+import { formatMatchDate } from "@/lib/format-date";
 
 const KNOCKOUT_LABELS: Record<string, string> = {
   r32: "Round of 32",
@@ -18,9 +19,11 @@ const KNOCKOUT_LABELS: Record<string, string> = {
 
 type Props = {
   game: EnrichedGame;
+  homeMemberName?: string | null;
+  awayMemberName?: string | null;
 };
 
-export function MatchCard({ game }: Props) {
+export function MatchCard({ game, homeMemberName, awayMemberName }: Props) {
   const isFinished = game.finished?.toUpperCase() === "TRUE";
   const homeScorers = parseScorers(game.home_scorers);
   const awayScorers = parseScorers(game.away_scorers);
@@ -66,6 +69,11 @@ export function MatchCard({ game }: Props) {
           <span className="text-xs font-semibold text-center leading-tight line-clamp-2">
             {game.home_team_name_en}
           </span>
+          {homeMemberName && (
+            <span className="text-[0.65rem] text-muted-foreground text-center leading-tight">
+              {homeMemberName}
+            </span>
+          )}
         </div>
 
         {/* vs */}
@@ -93,6 +101,11 @@ export function MatchCard({ game }: Props) {
           <span className="text-xs font-semibold text-center leading-tight line-clamp-2">
             {game.away_team_name_en}
           </span>
+          {awayMemberName && (
+            <span className="text-[0.65rem] text-muted-foreground text-center leading-tight">
+              {awayMemberName}
+            </span>
+          )}
         </div>
       </div>
 
@@ -104,7 +117,7 @@ export function MatchCard({ game }: Props) {
           </span>
         ) : (
           <span className="text-sm text-muted-foreground font-medium">
-            {game.local_date}
+            {formatMatchDate(game.local_date) || game.local_date}
           </span>
         )}
       </div>

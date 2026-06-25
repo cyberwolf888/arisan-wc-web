@@ -3,7 +3,9 @@ import { unstable_rethrow } from "next/navigation";
 import type { EnrichedTeam } from "@/components/group-standings-table";
 import { HomeSearchWrapper } from "@/components/home-search-wrapper";
 import { PageErrorState } from "@/components/page-error-state";
+import { R32MatchesSection, type R32Game } from "@/components/r32-matches-section";
 import { getErrorMessage } from "@/lib/errors";
+import { fetchGames } from "@/lib/games-api";
 import { fetchGroupStandings } from "@/lib/groups-api";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/types";
@@ -23,12 +25,13 @@ function normalizeGroup(value: string | null) {
 async function getHomeData() {
   const supabase = await createClient();
 
-  // Fetch Supabase data + external API in parallel
-  const [teamsResult, membersResult, assignmentsResult, groupStatsMap] = await Promise.all([
+  // Fetch Supabase data + external APIs in parallel
+  const [teamsResult, membersResult, assignmentsResult, groupStatsMap, allGames] = await Promise.all([
     supabase.from("teams").select("_id,id,groups,name_en,flag"),
     supabase.from("members").select("_id,name"),
     supabase.from("member_teams").select("member_id,team_id"),
     fetchGroupStandings(),
+    fetchGames(),
   ]);
 
   if (teamsResult.error) {
@@ -80,6 +83,30 @@ async function getHomeData() {
     groupedTeams.push(team);
     teamsByGroup.set(group, groupedTeams);
   }
+
+  // ── Build R32 enriched games ─────────────────────────────────────────────
+  const R32_TYPES = new Set(["r32", "round_of_32"]);
+
+  const r32Games: R32Game[] = allGames
+    .filter((g) => R32_TYPES.has(g.type?.toLowerCase() ?? ""))
+    .map((g) => {
+      const homeNumericId = parseInt(g.home_team_id, 10);
+      const awayNumericId = parseInt(g.away_team_id, 10);
+
+      const homeTeam = isNaN(homeNumericId) ? undefined : teamByNumericId.get(homeNumericId);
+      const awayTeam = isNaN(awayNumericId) ? undefined : teamByNumericId.get(awayNumericId);
+
+      const homeMemberNames = homeTeam ? (membersByTeamId.get(homeTeam._id) ?? []) : [];
+      const awayMemberNames = awayTeam ? (membersByTeamId.get(awayTeam._id) ?? []) : [];
+
+      return {
+        ...g,
+        homeFlagUrl: homeTeam?.flag ?? null,
+        awayFlagUrl: awayTeam?.flag ?? null,
+        homeMemberName: homeMemberNames.length > 0 ? homeMemberNames.join(", ") : null,
+        awayMemberName: awayMemberNames.length > 0 ? awayMemberNames.join(", ") : null,
+      };
+    });
 
   // ── Determine ordered group keys ─────────────────────────────────────────
   const extraGroups = Array.from(teamsByGroup.keys())
@@ -138,6 +165,7 @@ async function getHomeData() {
     enrichedByGroup,
     totalTeams: teams.length,
     totalAssignments: assignments.length,
+    r32Games,
   };
 }
 
@@ -168,20 +196,12 @@ export default async function HomePage() {
     );
   }
 
-  const { orderedGroups, enrichedByGroup, totalTeams, totalAssignments } = result.data;
+  const { orderedGroups, enrichedByGroup, totalTeams, totalAssignments, r32Games } = result.data;
 
   return (
     <section className="w-full space-y-6">
-      {/* <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
-        <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
-          Arisan Bola PELITA
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Team Representatives</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Read-only list of teams and assigned members. {totalTeams} teams, {totalAssignments} active
-          assignments.
-        </p>
-      </div> */}
+      {/* R32 Matches — above search bar */}
+      <R32MatchesSection games={r32Games} />
 
       <HomeSearchWrapper
         orderedGroups={orderedGroups}
